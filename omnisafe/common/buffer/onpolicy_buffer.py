@@ -109,6 +109,9 @@ class OnPolicyBuffer(BaseBuffer):  # pylint: disable=too-many-instance-attribute
         self.data['target_value_c'] = torch.zeros((size,), dtype=torch.float32, device=device)
         self.data['logp'] = torch.zeros((size,), dtype=torch.float32, device=device)
 
+        # Add discount factor
+        self.data['gamma'] = torch.zeros((size,), dtype=torch.float32, device=device)
+
         self._gamma: float = gamma
         self._lam: float = lam
         self._lam_c: float = lam_c
@@ -149,6 +152,7 @@ class OnPolicyBuffer(BaseBuffer):  # pylint: disable=too-many-instance-attribute
         self,
         last_value_r: torch.Tensor | None = None,
         last_value_c: torch.Tensor | None = None,
+        last_gamma:   torch.Tensor | None = None,
     ) -> None:
         """Finish the current path and calculate the advantages of state-action pairs.
 
@@ -171,6 +175,8 @@ class OnPolicyBuffer(BaseBuffer):  # pylint: disable=too-many-instance-attribute
             last_value_r = torch.zeros(1, device=self._device)
         if last_value_c is None:
             last_value_c = torch.zeros(1, device=self._device)
+        if last_gamma is None:
+            last_gamma = torch.zeros(1, device=self._device)
 
         path_slice = slice(self.path_start_idx, self.ptr)
         last_value_r = last_value_r.to(self._device)
@@ -180,18 +186,27 @@ class OnPolicyBuffer(BaseBuffer):  # pylint: disable=too-many-instance-attribute
         costs = torch.cat([self.data['cost'][path_slice], last_value_c])
         values_c = torch.cat([self.data['value_c'][path_slice], last_value_c])
 
-        discountred_ret = discount_cumsum(rewards, self._gamma)[:-1]
+        # Add discount factor
+        if 'gamma' in self.data:
+            gamma = torch.cat([self.data['gamma'][path_slice], last_gamma])
+            discountred_ret = discount_cumsum(rewards, gamma)[:-1]
+        else:
+            gamma = None
+            discountred_ret = discount_cumsum(rewards, self._gamma)[:-1]
+        
         self.data['discounted_ret'][path_slice] = discountred_ret
         rewards -= self._penalty_coefficient * costs
 
         adv_r, target_value_r = self._calculate_adv_and_value_targets(
             values_r,
             rewards,
+            gamma,
             lam=self._lam,
         )
         adv_c, target_value_c = self._calculate_adv_and_value_targets(
             values_c,
             costs,
+            gamma,
             lam=self._lam_c,
         )
 
@@ -241,6 +256,7 @@ class OnPolicyBuffer(BaseBuffer):  # pylint: disable=too-many-instance-attribute
         self,
         values: torch.Tensor,
         rewards: torch.Tensor,
+        gamma: torch.Tensor | None,
         lam: float,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         r"""Compute the estimated advantage.
@@ -327,8 +343,13 @@ class OnPolicyBuffer(BaseBuffer):  # pylint: disable=too-many-instance-attribute
 
         elif self._advantage_estimator == 'plain':
             # A(x, u) = Q(x, u) - V(x) = r(x, u) + gamma V(x+1) - V(x)
-            adv = rewards[:-1] + self._gamma * values[1:] - values[:-1]
-            target_value = discount_cumsum(rewards, self._gamma)[:-1]
+            # advantage for every step
+            if gamma is not None:
+                adv = rewards[:-1] + gamma[:-1] * values[1:] - values[:-1]
+                target_value = discount_cumsum(rewards, gamma)[:-1]
+            else:
+                adv = rewards[:-1] + self._gamma * values[1:] - values[:-1]
+                target_value = discount_cumsum(rewards, self._gamma)[:-1]
 
         else:
             raise NotImplementedError

@@ -31,11 +31,14 @@ dependencies:
   - pip
 
   # Learning
-  - pytorch::pytorch >= 1.10.0  # sync with project.dependencies
-  - pytorch::torchvision
-  - pytorch::pytorch-mutex = *=*cuda*
+  # - pytorch::pytorch >= 1.10.0  # sync with project.dependencies
+  # - pytorch::torchvision
+  # - pytorch::pytorch-mutex = *=*cuda*
   - pip:
       - safety-gymnasium >= 0.1
+      # - pytorch
+      # - torchvision
+
   - tensorboard
   - wandb
 

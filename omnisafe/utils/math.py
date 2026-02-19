@@ -56,7 +56,32 @@ def get_diagonal(tensor: torch.Tensor) -> torch.Tensor:
     return tensor.diagonal(dim1=-2, dim2=-1).sum(-1)
 
 
-def discount_cumsum(vector_x: torch.Tensor, discount: float) -> torch.Tensor:
+# def discount_cumsum(vector_x: torch.Tensor, discount: float) -> torch.Tensor:
+#     """Compute the discounted cumulative sum of vectors.
+
+#     Examples:
+#         >>> vector_x = torch.arange(1, 5)
+#         >>> vector_x
+#         tensor([1, 2, 3, 4])
+#         >>> discount_cumsum(vector_x, 0.9)
+#         tensor([8.15, 5.23, 2.80, 1.00])
+
+#     Args:
+#         vector_x (torch.Tensor): A sequence of shape (B, T).
+#         discount (float): The discount factor.
+
+#     Returns:
+#         The discounted cumulative sum of vectors.
+#     """
+#     length = vector_x.shape[0]
+#     vector_x = vector_x.type(torch.float64)
+#     cumsum = vector_x[-1]
+#     for idx in reversed(range(length - 1)):
+#         cumsum = vector_x[idx] + discount * cumsum
+#         vector_x[idx] = cumsum
+#     return vector_x
+
+def discount_cumsum(vector_x: torch.Tensor, discount: float|torch.Tensor) -> torch.Tensor:
     """Compute the discounted cumulative sum of vectors.
 
     Examples:
@@ -64,11 +89,11 @@ def discount_cumsum(vector_x: torch.Tensor, discount: float) -> torch.Tensor:
         >>> vector_x
         tensor([1, 2, 3, 4])
         >>> discount_cumsum(vector_x, 0.9)
-        tensor([8.15, 5.23, 2.80, 1.00])
+        tensor([8.15, 7.94, 6.60, 4.00])
 
     Args:
-        vector_x (torch.Tensor): A sequence of shape (B, T).
-        discount (float): The discount factor.
+        vector_x (torch.Tensor): A sequence of shape (timesteps, batch).
+        discount (float or torch.Tensor): A float or sequence of shape (T, B)
 
     Returns:
         The discounted cumulative sum of vectors.
@@ -76,8 +101,12 @@ def discount_cumsum(vector_x: torch.Tensor, discount: float) -> torch.Tensor:
     length = vector_x.shape[0]
     vector_x = vector_x.type(torch.float64)
     cumsum = vector_x[-1]
+    # iterate from second-to-last value to beginning
     for idx in reversed(range(length - 1)):
-        cumsum = vector_x[idx] + discount * cumsum
+        if isinstance(discount, float):
+            cumsum = vector_x[idx] + discount * cumsum
+        else:
+            cumsum = vector_x[idx] + discount[idx]*cumsum
         vector_x[idx] = cumsum
     return vector_x
 

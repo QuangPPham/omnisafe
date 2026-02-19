@@ -622,6 +622,11 @@ class Unsqueeze(Wrapper):
         for k, v in info.items():
             if isinstance(v, torch.Tensor):
                 info[k] = v.unsqueeze(0)
+        # handle final_info dict
+        if 'final_info' in info:
+            for k, v in info['final_info'].items():
+                if isinstance(v, torch.Tensor):
+                    info['final_info'][k] = v.unsqueeze(0)
 
         return obs, reward, cost, terminated, truncated, info
 
@@ -648,5 +653,10 @@ class Unsqueeze(Wrapper):
         for k, v in info.items():
             if isinstance(v, torch.Tensor):
                 info[k] = v.unsqueeze(0)
+        # handle final_info dict
+        if 'final_info' in info:
+            for k, v in info['final_info'].items():
+                if isinstance(v, torch.Tensor):
+                    info['final_info'][k] = v.unsqueeze(0)
 
         return obs, info

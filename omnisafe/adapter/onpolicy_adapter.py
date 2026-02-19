@@ -55,7 +55,7 @@ class OnPolicyAdapter(OnlineAdapter):
         super().__init__(env_id, num_envs, seed, cfgs)
         self._reset_log()
 
-    def rollout(  # pylint: disable=too-many-locals
+    def rollout(
         self,
         steps_per_epoch: int,
         agent: ConstraintActorCritic,
@@ -82,8 +82,16 @@ class OnPolicyAdapter(OnlineAdapter):
             range(steps_per_epoch),
             description=f'Processing rollout for epoch: {logger.current_epoch}...',
         ):
+            # action from policy and value from critic
             act, value_r, value_c, logp = agent.step(obs)
+            # step and get info
             next_obs, reward, cost, terminated, truncated, info = self.step(act)
+
+            # for 1 environment only
+            if 'final_observation' not in info:
+                gamma = info['gamma']
+            else:
+                gamma = info['final_info']['gamma']
 
             self._log_value(reward=reward, cost=cost, info=info)
 
@@ -96,6 +104,7 @@ class OnPolicyAdapter(OnlineAdapter):
                 act=act,
                 reward=reward,
                 cost=cost,
+                gamma=gamma,
                 value_r=value_r,
                 value_c=value_c,
                 logp=logp,
@@ -115,15 +124,20 @@ class OnPolicyAdapter(OnlineAdapter):
                 if epoch_end or done or time_out:
                     last_value_r = torch.zeros(1)
                     last_value_c = torch.zeros(1)
+                    last_gamma = torch.zeros(1)
                     if not done:
                         if epoch_end:
                             _, last_value_r, last_value_c, _ = agent.step(obs[idx])
+                            last_gamma = info['gamma'][idx]
                         if time_out:
                             _, last_value_r, last_value_c, _ = agent.step(
                                 info['final_observation'][idx],
                             )
+                            last_gamma = info['final_info']['gamma'][idx]
+                        # unsqueeze to make it a vector for concatenating
                         last_value_r = last_value_r.unsqueeze(0)
                         last_value_c = last_value_c.unsqueeze(0)
+                        last_gamma   = last_gamma.unsqueeze(0)
 
                     if done or time_out:
                         self._log_metrics(logger, idx)
@@ -133,7 +147,7 @@ class OnPolicyAdapter(OnlineAdapter):
                         self._ep_cost[idx] = 0.0
                         self._ep_len[idx] = 0.0
 
-                    buffer.finish_path(last_value_r, last_value_c, idx)
+                    buffer.finish_path(last_value_r, last_value_c, last_gamma, idx) # idx=0 in our case for 1 env
 
     def _log_value(
         self,

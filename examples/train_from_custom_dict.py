@@ -16,25 +16,29 @@
 
 import omnisafe
 
-
 if __name__ == '__main__':
-    env_id = 'SafetyPointGoal1-v0'
+    env_id = 'ltl-SafetyPointGoal0-v0'
     custom_cfgs = {
+        'seed': 0,
         'train_cfgs': {
-            'total_steps': 1024000,
+            'device': 'cuda:0',
+            'torch_threads': 6,
+            'total_steps': 409600, # 1024000,
             'vector_env_nums': 1,
             'parallel': 1,
         },
         'algo_cfgs': {
             'steps_per_epoch': 2048,
             'update_iters': 1,
+            'adv_estimation_method': 'plain',
         },
         'logger_cfgs': {
             'use_wandb': False,
+            'log_dir': "/blue/yuwang1/quangpham/omnisafe_runs",
         },
     }
 
-    agent = omnisafe.Agent('PPOLag', env_id, custom_cfgs=custom_cfgs)
+    agent = omnisafe.Agent('PPO', env_id, custom_cfgs=custom_cfgs)
     agent.learn()
 
     agent.plot(smooth=1)

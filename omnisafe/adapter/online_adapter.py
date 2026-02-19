@@ -179,7 +179,7 @@ class OnlineAdapter:
         return self._env.observation_space
 
     def step(
-        self,
+        self, 
         action: torch.Tensor,
     ) -> tuple[
         torch.Tensor,
